@@ -1,5 +1,12 @@
 package main
 
+import (
+	"fmt"
+	"go-tg-transcriber/config"
+)
+
 func main() {
-	println("huy")
+	cfg := config.MustLoad()
+
+	fmt.Println(cfg)
 }

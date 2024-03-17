@@ -30,8 +30,8 @@
 #        claimName: pvc0001
 
 
-
-# Use `minikube service minio-deployment` to tunnel into deployment from host machine of minikube
+# Use `kubectl expose deployment/minio-deployment --type="NodePort" --port=9000,9001` to expose deployment into cluster
+# Use `minikube service minio-deployment` to tunnel into cluster from host machine
 apiVersion: apps/v1
 kind: Deployment
 metadata:

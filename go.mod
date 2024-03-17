@@ -1,4 +1,4 @@
-module go-tg-transcriber
+module github.com/m1ker1n-transcriber/go-telegram
 
 go 1.22.0
 

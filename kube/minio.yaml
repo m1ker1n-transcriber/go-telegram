@@ -1,0 +1,68 @@
+# Deploys a new MinIO Pod into the metadata.namespace Kubernetes namespace
+#
+# The `spec.containers[0].args` contains the command run on the pod
+# The `/data` directory corresponds to the `spec.containers[0].volumeMounts[0].mountPath`
+# That mount path corresponds to a Kubernetes HostPath which binds `/data` to a local drive or volume on the worker node where the pod runs
+#
+
+# just pod
+#apiVersion: v1
+#kind: Pod
+#metadata:
+#  labels:
+#    app: minio
+#  name: minio
+#spec:
+#  containers:
+#    - name: minio
+#      image: quay.io/minio/minio:latest
+#      command:
+#        - /bin/bash
+#        - -c
+#      args:
+#        - minio server /data --console-address :9001
+#      volumeMounts:
+#        - mountPath: /data
+#          name: localvolume # Corresponds to the `spec.volumes` Persistent Volume
+#  volumes:
+#    - name: localvolume
+#      persistentVolumeClaim:
+#        claimName: pvc0001
+
+
+
+# Use `minikube service minio-deployment` to tunnel into deployment from host machine of minikube
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: minio
+  name: minio-deployment
+spec:
+  selector:
+    matchLabels:
+      app: minio
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: minio
+      name: minio
+    spec:
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:latest
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - minio server /data --console-address :9001
+          volumeMounts:
+            - mountPath: /data
+              name: localvolume # Corresponds to the `spec.volumes` Persistent Volume
+      volumes:
+        - name: localvolume
+          persistentVolumeClaim:
+            claimName: pvc0001

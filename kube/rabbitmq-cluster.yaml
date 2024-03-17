@@ -1,0 +1,17 @@
+#BASH:
+#username="$(kubectl get secret hello-world-default-user -o jsonpath='{.data.username}' | base64 --decode)"
+#echo "username: $username"
+#password="$(kubectl get secret hello-world-default-user -o jsonpath='{.data.password}' | base64 --decode)"
+#echo "password: $password"
+#
+#Использование миникуба с винды в весле: https://www.jamessturtevant.com/posts/Running-Kubernetes-Minikube-on-Windows-10-with-WSL/
+#POWERSHELL (это пиздец какой-то, выдают иероглифы, и выглядит уродски):
+#$usernameBase64 = kubectl get secret hello-world-default-user -o jsonpath='{.data.username}'
+#$username = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($usernameBase64))
+#$passwordBase64 = kubectl get secret hello-world-default-user -o jsonpath='{.data.password}'
+#$password = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($usernameBase64))
+#kubectl port-forward "service/hello-world" 15672
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: hello-world

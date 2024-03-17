@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go-tg-transcriber/config"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"time"
 
@@ -13,8 +15,13 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
+	minioClient, err := NewMinioClient(cfg.Minio)
+	if err != nil {
+		panic(err)
+	}
+
 	pref := tele.Settings{
-		Token:  cfg.TelegramApiToken,
+		Token:  cfg.Telegram.ApiToken,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
 	}
 
@@ -29,17 +36,60 @@ func main() {
 	})
 
 	b.Handle(tele.OnVoice, func(c tele.Context) error {
-		g, _ := errgroup.WithContext(context.Background())
-
-		for _, msg := range []string{".", "..", "...", "transcribed as ass"} {
-			g.Go(func() error {
-				return c.Send(msg)
-			})
-			time.Sleep(time.Second)
+		err := c.Reply("Received voice message to transcribe.")
+		if err != nil {
+			return err
 		}
 
-		return g.Wait()
+		voice := c.Message().Voice
+		rc, err := b.File(voice.MediaFile())
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Minio.UploadTimeout)
+		defer cancel()
+		uploadInfo, err := minioClient.PutObject(ctx, cfg.Minio.BucketName, voice.UniqueID, rc, voice.FileSize, minio.PutObjectOptions{})
+		if err != nil {
+			return c.Reply(err)
+		}
+
+		return c.Reply(fmt.Sprintf("Downloaded voice message: %d", uploadInfo.Size))
 	})
 
 	b.Start()
+}
+
+func NewMinioClient(cfg config.MinioConfig) (*minio.Client, error) {
+	ctx := context.Background()
+
+	// Initialize minio client object.
+	minioClient, err := minio.New(cfg.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure: false,
+		Region: cfg.Region,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Create bucket if not exist
+	err = minioClient.MakeBucket(ctx, cfg.BucketName, minio.MakeBucketOptions{
+		Region: cfg.Region,
+	})
+	if err != nil {
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(ctx, cfg.BucketName)
+		if errBucketExists == nil && exists {
+			log.Printf("We already own %s\n", cfg.BucketName)
+			return minioClient, nil
+		} else {
+			log.Fatalln(err)
+		}
+	} else {
+		log.Printf("Successfully created %s\n", cfg.BucketName)
+	}
+
+	return minioClient, err
 }

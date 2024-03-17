@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Telegram TelegramConfig `env-prefix:"TELEGRAM_"`
 	Minio    MinioConfig    `env-prefix:"MINIO_"`
+	AMQP     AMQPConfig     `env-prefix:"AMQP_"`
 }
 
 type TelegramConfig struct {
@@ -22,6 +23,13 @@ type MinioConfig struct {
 	SecretKey     string        `env:"SECRET_KEY" env-required:"true"`
 	BucketName    string        `env:"BUCKET_NAME" env-required:"true"`
 	UploadTimeout time.Duration `env:"UPLOAD_TIMEOUT" env-default:"10m"`
+}
+
+type AMQPConfig struct {
+	URL           string        `env:"URL" env-required:"true"`
+	SendQueueName string        `env:"SEND_QUEUE_NAME" env-required:"true"`
+	SendTimeout   time.Duration `env:"SEND_TIMEOUT" env-default:"5s"`
+	//ReceiveQueueName string `env:"URL" env-required:"true"`
 }
 
 func MustLoad() Config {

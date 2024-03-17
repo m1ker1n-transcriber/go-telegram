@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/m1ker1n-transcriber/go-telegram/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"time"
 
@@ -14,6 +16,30 @@ import (
 
 func main() {
 	cfg := config.MustLoad()
+
+	amqpConn, err := NewAMQPConn(cfg.AMQP)
+	if err != nil {
+		panic(err)
+	}
+	defer amqpConn.Close()
+
+	ch, err := amqpConn.Channel()
+	if err != nil {
+		panic(err)
+	}
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		cfg.AMQP.SendQueueName, // name
+		false,                  // durable
+		false,                  // delete when unused
+		false,                  // exclusive
+		false,                  // no-wait
+		nil,                    // arguments
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	minioClient, err := NewMinioClient(cfg.Minio)
 	if err != nil {
@@ -32,6 +58,10 @@ func main() {
 	}
 
 	b.Handle("/hello", func(c tele.Context) error {
+		_, err = c.Bot().Send(&tele.User{ID: 910754150}, "zhopa", &tele.SendOptions{ReplyTo: &tele.Message{ID: 203}})
+		if err != nil {
+			return err
+		}
 		return c.Send("Hello!")
 	})
 
@@ -48,13 +78,37 @@ func main() {
 		}
 		defer rc.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Minio.UploadTimeout)
+		minioCtx, cancel := context.WithTimeout(context.Background(), cfg.Minio.UploadTimeout)
 		defer cancel()
-		uploadInfo, err := minioClient.PutObject(ctx, cfg.Minio.BucketName, voice.UniqueID, rc, voice.FileSize, minio.PutObjectOptions{})
+		uploadInfo, err := minioClient.PutObject(minioCtx, cfg.Minio.BucketName, voice.UniqueID, rc, voice.FileSize, minio.PutObjectOptions{})
 		if err != nil {
 			return c.Reply(err)
 		}
 
+		amqpCtx, cancel := context.WithTimeout(context.Background(), cfg.AMQP.SendTimeout)
+		defer cancel()
+
+		body, err := json.Marshal(map[string]any{
+			"telegram-user-id": c.Sender().ID,
+			"telegram-msg-id":  c.Message().ID,
+			"voice-unique-id":  voice.UniqueID,
+		})
+		if err != nil {
+			return err
+		}
+		err = ch.PublishWithContext(amqpCtx,
+			"",     // exchange
+			q.Name, // routing key
+			false,  // mandatory
+			false,  // immediate
+
+			amqp.Publishing{
+				ContentType: "application/json",
+				Body:        body,
+			})
+		if err != nil {
+			return err
+		}
 		return c.Reply(fmt.Sprintf("Downloaded voice message: %d bytes, unique ID: %s. It will be transcribed later.", uploadInfo.Size, voice.UniqueID))
 	})
 
@@ -92,4 +146,8 @@ func NewMinioClient(cfg config.MinioConfig) (*minio.Client, error) {
 	}
 
 	return minioClient, err
+}
+
+func NewAMQPConn(cfg config.AMQPConfig) (*amqp.Connection, error) {
+	return amqp.Dial(cfg.URL)
 }

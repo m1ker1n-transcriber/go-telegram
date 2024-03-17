@@ -10,7 +10,10 @@
 #$username = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($usernameBase64))
 #$passwordBase64 = kubectl get secret hello-world-default-user -o jsonpath='{.data.password}'
 #$password = [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($usernameBase64))
+#
 #kubectl port-forward "service/hello-world" 15672
+#service="$(kubectl get service hello-world -o jsonpath='{.spec.clusterIP}')"
+#minikube service hello-world
 apiVersion: rabbitmq.com/v1beta1
 kind: RabbitmqCluster
 metadata:

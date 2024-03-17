@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/m1ker1n-transcriber/go-telegram/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"go-tg-transcriber/config"
 	"log"
 	"time"
 

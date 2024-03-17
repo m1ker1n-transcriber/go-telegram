@@ -55,7 +55,7 @@ func main() {
 			return c.Reply(err)
 		}
 
-		return c.Reply(fmt.Sprintf("Downloaded voice message: %d", uploadInfo.Size))
+		return c.Reply(fmt.Sprintf("Downloaded voice message: %d bytes, unique ID: %s. It will be transcribed later.", uploadInfo.Size, voice.UniqueID))
 	})
 
 	b.Start()

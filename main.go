@@ -29,13 +29,25 @@ func main() {
 	}
 	defer ch.Close()
 
-	q, err := ch.QueueDeclare(
+	senqQ, err := ch.QueueDeclare(
 		cfg.AMQP.SendQueueName, // name
 		false,                  // durable
 		false,                  // delete when unused
 		false,                  // exclusive
 		false,                  // no-wait
 		nil,                    // arguments
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	recvQ, err := ch.QueueDeclare(
+		cfg.AMQP.ReceiveQueueName, // name
+		false,                     // durable
+		false,                     // delete when unused
+		false,                     // exclusive
+		false,                     // no-wait
+		nil,                       // arguments
 	)
 	if err != nil {
 		panic(err)
@@ -58,10 +70,6 @@ func main() {
 	}
 
 	b.Handle("/hello", func(c tele.Context) error {
-		_, err = c.Bot().Send(&tele.User{ID: 910754150}, "zhopa", &tele.SendOptions{ReplyTo: &tele.Message{ID: 203}})
-		if err != nil {
-			return err
-		}
 		return c.Send("Hello!")
 	})
 
@@ -97,10 +105,10 @@ func main() {
 			return err
 		}
 		err = ch.PublishWithContext(amqpCtx,
-			"",     // exchange
-			q.Name, // routing key
-			false,  // mandatory
-			false,  // immediate
+			"",         // exchange
+			senqQ.Name, // routing key
+			false,      // mandatory
+			false,      // immediate
 
 			amqp.Publishing{
 				ContentType: "application/json",
@@ -111,6 +119,52 @@ func main() {
 		}
 		return c.Reply(fmt.Sprintf("Downloaded voice message: %d bytes, unique ID: %s. It will be transcribed later.", uploadInfo.Size, voice.UniqueID))
 	})
+
+	msgs, err := ch.Consume(
+		recvQ.Name, // queue
+		"",         // consumer
+		true,       // auto-ack
+		false,      // exclusive
+		false,      // no-local
+		false,      // no-wait
+		nil,        // args
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for d := range msgs {
+			log.Printf("Received a message: %s", d.Body)
+			data := map[string]any{}
+			err := json.Unmarshal(d.Body, &data)
+			if err != nil {
+				panic(err)
+			}
+
+			tgUserIdFloat64, ok := (data["telegram-user-id"]).(float64)
+			if !ok {
+				panic(fmt.Errorf("nu blya data[\"telegram-user-id\"] eto float64"))
+			}
+			tgUserId := int64(tgUserIdFloat64)
+
+			tgMsgIdFloat64, ok := (data["telegram-msg-id"]).(float64)
+			if !ok {
+				panic(fmt.Errorf("nu blya data[\"telegram-user-id\"] eto float64"))
+			}
+			tgMsgId := int(tgMsgIdFloat64)
+
+			transcription, ok := (data["transcription"]).(string)
+			if !ok {
+				panic(fmt.Errorf("nu blya data[\"transcription\"] eto string"))
+			}
+
+			_, err = b.Send(&tele.User{ID: tgUserId}, transcription, &tele.SendOptions{ReplyTo: &tele.Message{ID: tgMsgId}})
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
 
 	b.Start()
 }

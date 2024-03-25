@@ -26,10 +26,10 @@ type MinioConfig struct {
 }
 
 type AMQPConfig struct {
-	URL              string        `env:"URL" env-required:"true"`
-	SendQueueName    string        `env:"SEND_QUEUE_NAME" env-required:"true"`
-	SendTimeout      time.Duration `env:"SEND_TIMEOUT" env-default:"5s"`
-	ReceiveQueueName string        `env:"RECEIVE_QUEUE_NAME" env-required:"true"`
+	URL             string        `env:"URL" env-required:"true"`
+	TaskQueueName   string        `env:"TASK_QUEUE_NAME" env-required:"true"`
+	SendTimeout     time.Duration `env:"SEND_TIMEOUT" env-default:"5s"`
+	ResultQueueName string        `env:"RESULT_QUEUE_NAME" env-required:"true"`
 }
 
 func MustLoad() Config {

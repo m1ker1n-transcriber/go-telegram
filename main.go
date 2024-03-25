@@ -29,8 +29,8 @@ func main() {
 	}
 	defer ch.Close()
 
-	senqQ, err := ch.QueueDeclare(
-		cfg.AMQP.SendQueueName, // name
+	taskQ, err := ch.QueueDeclare(
+		cfg.AMQP.TaskQueueName, // name
 		false,                  // durable
 		false,                  // delete when unused
 		false,                  // exclusive
@@ -41,13 +41,13 @@ func main() {
 		panic(err)
 	}
 
-	recvQ, err := ch.QueueDeclare(
-		cfg.AMQP.ReceiveQueueName, // name
-		false,                     // durable
-		false,                     // delete when unused
-		false,                     // exclusive
-		false,                     // no-wait
-		nil,                       // arguments
+	resultQ, err := ch.QueueDeclare(
+		cfg.AMQP.ResultQueueName, // name
+		false,                    // durable
+		false,                    // delete when unused
+		false,                    // exclusive
+		false,                    // no-wait
+		nil,                      // arguments
 	)
 	if err != nil {
 		panic(err)
@@ -106,7 +106,7 @@ func main() {
 		}
 		err = ch.PublishWithContext(amqpCtx,
 			"",         // exchange
-			senqQ.Name, // routing key
+			taskQ.Name, // routing key
 			false,      // mandatory
 			false,      // immediate
 
@@ -121,13 +121,13 @@ func main() {
 	})
 
 	msgs, err := ch.Consume(
-		recvQ.Name, // queue
-		"",         // consumer
-		true,       // auto-ack
-		false,      // exclusive
-		false,      // no-local
-		false,      // no-wait
-		nil,        // args
+		resultQ.Name, // queue
+		"",           // consumer
+		true,         // auto-ack
+		false,        // exclusive
+		false,        // no-local
+		false,        // no-wait
+		nil,          // args
 	)
 	if err != nil {
 		panic(err)
